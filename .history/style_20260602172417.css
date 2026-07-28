@@ -1,0 +1,112 @@
+:root {
+  --primary: #800000; /* Guinda institucional */
+  --secondary: #a83232;
+  --accent: #d4ac0d; /* Dorado */
+  --light: #fdfdfd;
+  --dark: #111a16;
+  --text: #2c3e50;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--light);
+  color: var(--text);
+  margin: 0;
+  padding: 0;
+}
+
+/* Encabezado */
+header {
+  background: linear-gradient(rgba(128,0,0,0.8), rgba(17,26,22,0.95)), url('radio.png') no-repeat center/cover;
+  color: #fff;
+  text-align: center;
+  padding: 4rem 1rem;
+}
+
+.logo {
+  max-width: 160px; /* tamaño ideal del logo */
+  height: auto;
+  margin-bottom: 1rem;
+  filter: drop-shadow(0px 4px 8px rgba(0,0,0,0.3));
+}
+
+header h1 {
+  font-size: 2.8rem;
+  margin-bottom: 0.5rem;
+}
+
+header p {
+  font-size: 1.2rem;
+  font-style: italic;
+}
+
+/* Menú */
+nav {
+  background-color: var(--primary);
+  position: sticky;
+  top: 0;
+  text-align: center;
+  padding: 10px;
+}
+
+nav a {
+  color: white;
+  text-decoration: none;
+  margin: 0 15px;
+  font-weight: bold;
+}
+
+nav a:hover {
+  color: var(--accent);
+}
+
+/* Contenido */
+.container {
+  max-width: 1100px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+section {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+}
+
+section h2 {
+  color: var(--primary);
+  border-left: 5px solid var(--accent);
+  padding-left: 10px;
+}
+
+/* Botones */
+.grid-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.btn-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  color: white;
+  font-weight: bold;
+  border-radius: 12px;
+  text-decoration: none;
+}
+
+.facebook-btn { background-color: #1877f2; }
+.whatsapp-btn { background-color: #25d366; }
+.app-btn { background-color: var(--secondary); border: 2px solid var(--accent); }
+
+/* Pie de página */
+footer {
+  background-color: var(--primary);
+  color: white;
+  text-align: center;
+  padding: 1.5rem;
+}

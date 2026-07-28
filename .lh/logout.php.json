@@ -1,0 +1,18 @@
+{
+    "sourceFile": "logout.php",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1780901631389,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1780901631389,
+            "name": "Commit-0",
+            "content": "<?php\r\nsession_start();\r\n$_SESSION = array();\r\n\r\n// Si se desea destruir la cookie de sesión del navegador por completo\r\nif (ini_get(\"session.use_cookies\")) {\r\n    $params = session_get_cookie_params();\r\n    setcookie(session_name(), '', time() - 42000,\r\n        $params[\"path\"], $params[\"domain\"],\r\n        $params[\"secure\"], $params[\"httponly\"]\r\n    );\r\n}\r\n\r\nsession_destroy();\r\nheader(\"Location: login.php\");\r\nexit();\r\n?>"
+        }
+    ]
+}

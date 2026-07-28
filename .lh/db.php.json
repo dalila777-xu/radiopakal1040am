@@ -1,0 +1,26 @@
+{
+    "sourceFile": "db.php",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 2,
+            "patches": [
+                {
+                    "date": 1780902667563,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1780982255271,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,11 +1,11 @@\n <?php\r\n-$host = \"localhost\";\r\n-$user = \"root\";\r\n-$pass = \"12345678\";\r\n-$db   = \"radio_pakal\";\r\n+$servername = \"localhost\";\r\n+$username = \"root\";   // usuario por defecto en XAMPP\r\n+$password = \"\";       // normalmente vacío\r\n+$database = \"radio_pakal\"; // tu base de datos\r\n \r\n-$conn = mysqli_connect($host, $user, $pass, $db);\r\n+$conn = mysqli_connect($servername, $username, $password, $database);\r\n \r\n if (!$conn) {\r\n     die(\"Error de conexión: \" . mysqli_connect_error());\r\n }\r\n"
+                },
+                {
+                    "date": 1780982260971,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,8 +1,8 @@\n <?php\r\n $servername = \"localhost\";\r\n $username = \"root\";   // usuario por defecto en XAMPP\r\n-$password = \"\";       // normalmente vacío\r\n+$password = \"12345678\";       // normalmente vacío\r\n $database = \"radio_pakal\"; // tu base de datos\r\n \r\n $conn = mysqli_connect($servername, $username, $password, $database);\r\n \r\n"
+                }
+            ],
+            "date": 1780902667563,
+            "name": "Commit-0",
+            "content": "<?php\r\n$host = \"localhost\";\r\n$user = \"root\";\r\n$pass = \"12345678\";\r\n$db   = \"radio_pakal\";\r\n\r\n$conn = mysqli_connect($host, $user, $pass, $db);\r\n\r\nif (!$conn) {\r\n    die(\"Error de conexión: \" . mysqli_connect_error());\r\n}\r\n?>\r\n"
+        }
+    ]
+}
