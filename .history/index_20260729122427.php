@@ -1,0 +1,361 @@
+<?php
+// ==========================================
+// CONFIGURACIÓN DE SUPABASE (INTEGRADA)
+// ==========================================
+define('SUPABASE_URL', 'https://cwfydsatojsahuojvt.supabase.co');
+define('SUPABASE_KEY', 'sb_publishable_y-xMjQxSFvPaMusgSkT8Gg_9iFBM...'); // <--- ¡CAMBIALO POR TU CLAVE COMPLETA!
+
+/**
+ * Función para hacer peticiones mediante la API REST de Supabase
+ */
+function supabaseRequest($endpoint, $method = 'GET', $data = null, $queryParams = null) {
+    $url = SUPABASE_URL . '/rest/v1/' . $endpoint;
+    
+    if ($queryParams) {
+        $url .= '?' . $queryParams;
+    }
+
+    $ch = curl_init($url);
+
+    $headers = [
+        'apikey: ' . SUPABASE_KEY,
+        'Authorization: Bearer ' . SUPABASE_KEY,
+        'Content-Type: application/json',
+        'Prefer: return=representation'
+    ];
+
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+    if ($data && ($method == 'POST' || $method == 'PATCH' || $method == 'PUT')) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    }
+
+    $response = curl_exec($ch);
+    
+    if (curl_errno($ch)) {
+        $error = curl_error($ch);
+        curl_close($ch);
+        die("Error en la petición cURL a Supabase: " . $error);
+    }
+    
+    curl_close($ch);
+
+    return json_decode($response, true);
+}
+
+// ==========================================
+// CONFIGURACIÓN DE ZONA HORARIA
+// ==========================================
+date_default_timezone_set('America/Mexico_City');
+
+// ==========================================
+// FUNCIÓN: OBTENER INDICADOR DE TRANSMISIÓN
+// ==========================================
+function obtenerIndicadorTransmision($diaPrograma, $horaPrograma, $nombrePrograma) {
+    $diasSemana = [
+        1 => 'Lunes', 2 => 'Martes', 3 => 'Miércoles', 
+        4 => 'Jueves', 5 => 'Viernes', 6 => 'Sábado', 7 => 'Domingo'
+    ];
+    
+    $diaActualNum = (int)date('N');
+    $diaActualNombre = $diasSemana[$diaActualNum];
+    $horaActual = date('H:i');
+    
+    $diaCoincide = false;
+    $diaProgramaNorm = mb_strtolower(trim($diaPrograma), 'UTF-8');
+
+    if ($diaProgramaNorm == 'lunes a viernes' && $diaActualNum >= 1 && $diaActualNum <= 5) {
+        $diaCoincide = true;
+    } elseif ($diaProgramaNorm == 'miércoles a viernes' && $diaActualNum >= 3 && $diaActualNum <= 5) {
+        $diaCoincide = true;
+    } elseif ($diaProgramaNorm == 'lunes a martes' && $diaActualNum >= 1 && $diaActualNum <= 2) {
+        $diaCoincide = true;
+    } elseif ($diaProgramaNorm == 'lunes a domingo' && $diaActualNum >= 1 && $diaActualNum <= 7) {
+        $diaCoincide = true;
+    } elseif ($diaProgramaNorm == 'lunes y miércoles' && ($diaActualNum == 1 || $diaActualNum == 3)) {
+        $diaCoincide = true;
+    } elseif ($diaProgramaNorm == 'lunes y jueves' && ($diaActualNum == 1 || $diaActualNum == 4)) {
+        $diaCoincide = true;
+    } elseif (strpos($diaProgramaNorm, mb_strtolower($diaActualNombre, 'UTF-8')) !== false) {
+        $diaCoincide = true;
+    }
+
+    if (!$diaCoincide) return ''; 
+
+    $partesHora = explode('-', $horaPrograma);
+    if (count($partesHora) == 2) {
+        $horaInicio = trim($partesHora[0]);
+        $horaFin = trim($partesHora[1]);
+        
+        $horaInicioMin = strtotime($horaInicio);
+        $horaFinMin = strtotime($horaFin);
+        $horaActualMin = strtotime($horaActual);
+        
+        $minutosRestantesInicio = ($horaInicioMin - $horaActualMin) / 60;
+        
+        if ($minutosRestantesInicio > 0 && $minutosRestantesInicio <= 1) {
+            return '<span class="lucesita luz-rojo" title="Comienza en 1 minuto"></span>';
+        }
+        
+        if ($horaActualMin >= $horaInicioMin && $horaActualMin < $horaFinMin) {
+            return '<span class="lucesita luz-envivo" title="Al Aire"></span>';
+        }
+    }
+    
+    return ''; 
+}
+
+// ==========================================
+// MANEJO DE LOGIN
+// ==========================================
+session_start();
+
+if (isset($_SESSION['usuario'])) {
+  if (isset($_GET['page']) && $_GET['page'] === 'login') {
+    header('Location: admin.php'); exit();
+  }
+}
+
+$login_error = "";
+if ($_SERVER["REQUEST_METHOD"] === 'POST' && isset($_POST['login_action'])) {
+  $usuario = $_POST['usuario'] ?? '';
+  $password = $_POST['password'] ?? '';
+
+  if (!empty($usuario) && !empty($password)) {
+    $queryParams = 'usuario=eq.' . urlencode($usuario);
+    $user_data_array = supabaseRequest('usuarios', 'GET', null, $queryParams);
+    
+    if (!empty($user_data_array) && is_array($user_data_array) && count($user_data_array) > 0) {
+      $user_data = $user_data_array[0];
+      if ($password === $user_data['password']) {
+        $_SESSION['usuario'] = $user_data['usuario'];
+        $_SESSION['nombre'] = $user_data['nombre'] ?? $user_data['usuario'];
+        header('Location: admin.php'); exit();
+      } else {
+        $login_error = 'Contraseña incorrecta.';
+      }
+    } else {
+      $login_error = 'El usuario no existe.';
+    }
+  } else {
+    $login_error = 'Por favor, llena todos los campos.';
+  }
+}
+
+// Vista del Login
+if (isset($_GET['page']) && $_GET['page'] === 'login') {
+  ?>
+  <!DOCTYPE html>
+  <html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión | Radio Pakal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Inter',sans-serif}
+    body{background: #f8f5f0;display:flex;justify-content:center;align-items:center;height:100vh;color:#1a1a2e}
+    .login-container{background:white;padding:2.5rem;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,0.05);width:100%;max-width:400px;border-top:4px solid #0099FF}
+    .login-logo{display:block;margin:0 auto 1rem;width:120px;height:auto}
+    .text-center{text-align:center;margin-bottom:1.5rem}
+    .text-center h2{color: #1d4ed8;font-size:1.6rem;margin-bottom:.3rem}
+    .form-group{margin-bottom:1.2rem;position:relative}
+    .form-group i{position:absolute;left:12px;top:38px;color: #000000}
+    label{display:block;margin-bottom:.4rem;font-weight:600;font-size:.85rem;color:#1d4ed8}
+    input[type=text],input[type=password]{width:100%;padding:.75rem .75rem .75rem 2.2rem;border:1px solid #000000;border-radius:6px;font-size:.95rem}
+    .btn-submit{background: #0099FF;color:white;border:none;width:100%;padding:.75rem;border-radius:6px;font-size:1rem;font-weight:600;cursor:pointer;margin-top:.5rem}
+    .error-msg{background: #fde8e8;color: #e53e3e;padding:.75rem;border-radius:6px;font-size:.85rem;margin-bottom:1rem;text-align:center;border:1px solid #f8b4b4}
+    .back-link{display:block;text-align:center;margin-top:1.2rem;color: #000000;text-decoration:none;font-size:.85rem;font-weight:500}
+    </style>
+  </head>
+  <body>
+  <div class="login-container">
+    <img src="pm.png" alt="Logo Radio Pakal" class="login-logo" onerror="this.src='https://placehold.co/80x80?text=Logo'">
+    <div class="text-center"><h2>Panel de Control</h2><p></p></div>
+    <?php if(!empty($login_error)): ?>
+      <div class="error-msg"><?php echo htmlspecialchars($login_error); ?></div>
+    <?php endif; ?>
+    <form action="?page=login" method="POST">
+      <input type="hidden" name="login_action" value="1">
+      <div class="form-group"><label for="usuario">Usuario</label><i class="fas fa-user"></i><input type="text" id="usuario" name="usuario" required placeholder="Ingresa tu usuario"></div>
+      <div class="form-group"><label for="password">Contraseña</label><i class="fas fa-lock"></i><input type="password" id="password" name="password" required placeholder=""></div>
+      <button type="submit" class="btn-submit">Ingresar al Sistema</button>
+    </form>
+    <a href="index.php" class="back-link"><i class="fas fa-arrow-left"></i> Volver a la página web</a>
+  </div>
+  </body>
+  </html>
+  <?php
+  exit();
+}
+
+// ==========================================
+// CONSULTAS A SUPABASE
+// ==========================================
+
+$programas = supabaseRequest('programacion', 'GET');
+
+$horarios_data = supabaseRequest('programacion', 'GET', null, 'select=hora&order=hora.asc');
+$horarios = [];
+if (!empty($horarios_data) && is_array($horarios_data)) {
+    foreach ($horarios_data as $row) {
+        if (!in_array($row['hora'], $horarios)) {
+            $horarios[] = $row['hora'];
+        }
+    }
+}
+
+$carrusel_imagenes = supabaseRequest('carrusel', 'GET', null, 'order=id.desc');
+
+$publicaciones = supabaseRequest('publicaciones', 'GET', null, 'order=id.desc&limit=6');
+
+function obtenerImagenPublicacion($publicacion) {
+    $campos = ['imagen', 'foto', 'imagen_url', 'url_imagen', 'img', 'portada', 'foto_principal', 'image', 'cover'];
+    foreach ($campos as $campo) {
+        if (!empty($publicacion[$campo])) {
+            return $publicacion[$campo];
+        }
+    }
+    return '';
+}
+
+$dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+function obtenerProgramaEnCelda($programas, $dia, $hora) {
+    foreach ($programas as $p) {
+        $diaPrograma = trim($p['dia']);
+        $horaPrograma = trim($p['hora']);
+        if ($horaPrograma === $hora) {
+            $diaProgramaNorm = mb_strtolower($diaPrograma, 'UTF-8');
+            $diaNorm = mb_strtolower($dia, 'UTF-8');
+            
+            if ($diaProgramaNorm == 'lunes a viernes' && in_array($dia, ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'])) {
+                return $p;
+            } elseif ($diaProgramaNorm == 'lunes a domingo') {
+                return $p;
+            } elseif ($diaProgramaNorm == 'miércoles a viernes' && in_array($dia, ['Miércoles', 'Jueves', 'Viernes'])) {
+                return $p;
+            } elseif ($diaProgramaNorm == 'lunes a martes' && in_array($dia, ['Lunes', 'Martes'])) {
+                return $p;
+            } elseif ($diaProgramaNorm == 'lunes y miércoles' && in_array($dia, ['Lunes', 'Miércoles'])) {
+                return $p;
+            } elseif ($diaProgramaNorm == 'lunes y jueves' && in_array($dia, ['Lunes', 'Jueves'])) {
+                return $p;
+            } elseif (strpos($diaProgramaNorm, $diaNorm) !== false) {
+                return $p;
+            }
+        }
+    }
+    return null;
+}
+
+$diaActualNum = (int)date('N');
+$diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+$diaActualNombre = $diasSemana[$diaActualNum - 1];
+$horaServidor = date('H:i:s');
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <meta name="description" content="Radio Pakal 1040 AM - La voz oficial de Palenque, Chiapas. Música, cultura y noticias comunitarias.">
+  <title>RADIO PAKAL 1040 AM | Oficial - Palenque, Chiapas</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #ffffff; color: #1a1a2e; line-height: 1.6; scroll-behavior: smooth; }
+    @keyframes parpadeo-verde { 0% { opacity: 0.3; box-shadow: 0 0 5px #22c55e; } 50% { opacity: 1; box-shadow: 0 0 20px #22c55e, 0 0 40px #22c55e; } 100% { opacity: 0.3; box-shadow: 0 0 5px #22c55e; } }
+    @keyframes parpadeo-rojo { 0% { opacity: 0.3; box-shadow: 0 0 5px #ef4444; } 50% { opacity: 1; box-shadow: 0 0 20px #ef4444, 0 0 40px #ef4444; } 100% { opacity: 0.3; box-shadow: 0 0 5px #ef4444; } }
+    .lucesita { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .luz-envivo { background-color: #22c55e; animation: parpadeo-verde 1s infinite ease-in-out; box-shadow: 0 0 8px #22c55e; }
+    .luz-rojo { background-color: #ef4444; animation: parpadeo-rojo 0.5s infinite ease-in-out; box-shadow: 0 0 8px #ef4444; }
+    .luz-apagada { background-color: #d1d5db; opacity: 0.4; }
+    header { background: #ffffff; text-align: center; padding: 2rem 1.5rem; position: relative; border-bottom: 1px solid #f0f0f0; }
+    header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-image: url('aaa.png'); background-size: cover; background-position: center; background-repeat: no-repeat; opacity: 0.75; pointer-events: none; }
+    header > * { position: relative; z-index: 1; }
+    .logo { width: 270px; height: auto; margin-bottom: 1rem; }
+    header h1 { color: #144ea5; font-size: 1.8rem; margin-bottom: 0.5rem; }
+    header p { color: #000000; font-size: 1rem; }
+    nav { background: white; display: flex; justify-content: center; flex-wrap: wrap; gap: 0.5rem; padding: 0.8rem 1rem; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); border-bottom: 2px solid #000000; }
+    nav a { color: #1a1a2e; text-decoration: none; font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 40px; transition: all 0.3s ease; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+    nav a i { font-size: 0.9rem; color: #000000; }
+    #ubicacion h2 i, #ubicacion p i.fas.fa-map-pin { color: #ef4444; }
+    #ubicacion h2 i.fas.fa-phone-alt { color: #000000; }
+    #redes h2 i.fab.fa-facebook { color: #1877F2; }
+    nav a:hover { background: #5ca6f6; color: white; }
+    nav a:hover i { color: white; }
+    .container { max-width: 1200px; margin: 2.5rem auto; padding: 0 1.5rem; }
+    section { background: white; border: 1px solid #f0f0f0; border-radius: 12px; padding: 2rem; margin-bottom: 2rem; scroll-margin-top: 85px; }
+    section h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.2rem; display: flex; align-items: center; gap: 12px; border-left: 3px solid #D4AF37; padding-left: 1rem; color: #000000; }
+    section h2 i { color: #0e0b01; font-size: 1.5rem; }
+    .mision-vision-container { display: grid; grid-template-columns: repeat(2, minmax(250px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+    .mv-block { background: #faf8f5; border: 1px solid #f0f0f0; border-radius: 14px; padding: 1.4rem 1.5rem; }
+    .mv-block h3 { margin-bottom: 0.8rem; color: #000000; }
+    .mv-block p { line-height: 1.75; color: #333; }
+    .carousel-container { position: relative; width: 100%; max-width: 1000px; margin: 1.5rem auto 0; border-radius: 16px; overflow: hidden; background: #1a1a2e; border: none; box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
+    .carousel-track { display: flex; transition: transform 0.6s ease-in-out; list-style: none; padding: 0; margin: 0; height: 420px; }
+    .carousel-slide { min-width: 100%; flex-shrink: 0; height: 100%; position: relative; }
+    .carousel-slide img { width: 100%; height: 100%; object-fit: cover; display: block; background: #1a1a2e; }
+    .carousel-slide::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 40%; background: linear-gradient(to top, rgba(0,0,0,0.4), transparent); pointer-events: none; }
+    .carousel-slide .slide-title { position: absolute; bottom: 30px; left: 30px; color: white; font-size: 1.5rem; font-weight: 700; text-shadow: 0 2px 10px rgba(0,0,0,0.5); z-index: 2; max-width: 80%; font-family: 'Inter', sans-serif; }
+    .carousel-slide .slide-title span { display: block; font-size: 0.9rem; font-weight: 400; opacity: 0.8; margin-top: 4px; }
+    .carousel-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0, 0, 0, 0.5); color: white; border: 2px solid rgba(255,255,255,0.2); width: 48px; height: 48px; border-radius: 50%; cursor: pointer; z-index: 10; transition: all 0.3s ease; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .carousel-btn:hover { background: #8B2C2D; border-color: #8B2C2D; transform: translateY(-50%) scale(1.08); box-shadow: 0 4px 20px rgba(139,44,45,0.4); }
+    .carousel-btn-prev { left: 18px; }
+    .carousel-btn-next { right: 18px; }
+    .carousel-dots { display: flex; justify-content: center; gap: 12px; padding: 1rem; background: rgba(26, 26, 46, 0.85); position: absolute; bottom: 0; left: 0; right: 0; z-index: 5; backdrop-filter: blur(4px); }
+    .carousel-dot { width: 5px; height: 5px; border-radius: 50%; background: rgba(255, 255, 255, 0.3); border: 0.7px solid rgba(255,255,255,0.1); cursor: pointer; transition: all 0.3s ease; }
+    .carousel-dot:hover { background: rgba(255, 255, 255, 0.6); transform: scale(1.15); }
+    .carousel-dot.active { background: #49bcf6; border-color: #49bcf6; transform: scale(1.2); box-shadow: 0 0 20px rgba(212,175,55,0.3); }
+    .programacion-container { overflow-x: auto; margin-top: 1rem; }
+    .programacion-tabla { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 800px; }
+    .programacion-tabla th { background: #28acdc; color: white; padding: 10px 8px; text-align: center; font-weight: 700; font-size: 0.85rem; border: 1px solid #6e2122; }
+    .programacion-tabla td { padding: 8px 6px; text-align: center; border: 1px solid #e5e7eb; vertical-align: middle; font-size: 0.75rem; min-height: 40px; }
+    .programacion-tabla .hora-col { background: #f3f4f6; font-weight: 600; color: #1f2937; white-space: nowrap; min-width: 70px; }
+    .programacion-tabla .celda-programa { background: #fafafa; transition: background 0.3s ease; }
+    .programacion-tabla .celda-programa:hover { background: #f0f0f0; }
+    .programacion-tabla .celda-programa .nombre-programa { display: block; font-weight: 500; font-size: 0.7rem; line-height: 1.3; color: #1f2937; }
+    .programacion-tabla .celda-programa .nombre-programa.destacado { font-weight: 700; color: #8B2C2D; }
+    .programacion-tabla tbody tr:nth-child(even) .hora-col { background: #e5e7eb; }
+    .programacion-tabla tbody tr:nth-child(even) .celda-programa { background: #f8f8f8; }
+    .programacion-tabla tbody tr:nth-child(even) .celda-programa:hover { background: #f0f0f0; }
+    .programacion-tabla .celda-vacia { background: #f9fafb; color: #9ca3af; font-size: 0.65rem; }
+    .dia-actual th { background: #1a5a2a !important; border-color: #0d3d1a !important; box-shadow: inset 0 -3px 0 #D4AF37; }
+    .dia-actual th::after { content: '⬅ HOY'; display: block; box-sizing: border-box; font-size: 0.55rem; font-weight: 400; color: #D4AF37; margin-top: 2px; }
+    .grid-buttons { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
+    .btn-card { display: inline-flex; align-items: center; gap: 10px; padding: 0.8rem 1.5rem; border-radius: 50px; text-decoration: none; font-weight: 600; transition: all 0.3s ease; font-size: 0.9rem; }
+    .facebook-btn { background: #1877F2; color: white; }
+    .whatsapp-btn { background: #25D366; color: white; }
+    .btn-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+    #ubicacion p { background: #faf8f5; padding: 1rem; border-radius: 10px; margin-bottom: 1rem; border-left: 3px solid #d48337; }
+    iframe { width: 100%; height: 350px; border-radius: 12px; border: 1px solid #e8e8e8; margin-top: 0.5rem; }
+    footer { background: #1a1a2e; color: #cbd5e0; text-align: center; padding: 2rem; margin-top: 2rem; }
+    footer p { margin: 5px 0; }
+    footer p:first-child { font-weight: 600; color: white; }
+    .leyenda { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1rem; padding: 0.8rem 1.2rem; background: #f8f5f0; border-radius: 10px; font-size: 0.8rem; align-items: center; }
+    .leyenda-item { display: flex; align-items: center; gap: 6px; }
+    .leyenda-item .circulo { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+    .circulo-verde { background: #22c55e; animation: parpadeo-verde 1s infinite ease-in-out; box-shadow: 0 0 8px #22c55e; }
+    .circulo-rojo { background: #ef4444; animation: parpadeo-rojo 0.5s infinite ease-in-out; box-shadow: 0 0 8px #ef4444; }
+    .circulo-gris { background: #d1d5db; opacity: 0.4; }
+    @media (max-width: 1024px) { .carousel-track { height: 380px; } .carousel-slide .slide-title { font-size: 1.3rem; left: 24px; bottom: 24px; } }
+    @media (max-width: 768px) { header h1 { font-size: 1.4rem; } nav a { padding: 0.4rem 0.9rem; font-size: 0.75rem; } section { padding: 1.3rem; } section h2 { font-size: 1.2rem; } .carousel-container { border-radius: 12px; max-width: 100%; } .carousel-track { height: 300px; } .carousel-btn { width: 38px; height: 38px; font-size: 0.9rem; } .carousel-btn-prev { left: 12px; } .carousel-btn-next { right: 12px; } .carousel-dots { padding: 0.7rem; gap: 8px; } .carousel-dot { width: 10px; height: 10px; } .carousel-slide .slide-title { font-size: 1.1rem; left: 18px; bottom: 18px; } .carousel-slide .slide-title span { font-size: 0.75rem; } .programacion-tabla { font-size: 0.6rem; min-width: 600px; } .programacion-tabla th { font-size: 0.65rem; padding: 6px 4px; } .programacion-tabla td { padding: 4px 3px; font-size: 0.6rem; } .programacion-tabla .celda-programa .nombre-programa { font-size: 0.6rem; } .mision-vision-container { grid-template-columns: 1fr; } .dia-actual th::after { font-size: 0.45rem; } }
+    @media (max-width: 480px) { .grid-buttons { flex-direction: column; } .btn-card { justify-content: center; } .carousel-container { border-radius: 8px; } .carousel-track { height: 200px; } .carousel-btn { width: 30px; height: 30px; font-size: 0.7rem; } .carousel-btn-prev { left: 8px; } .carousel-btn-next { right: 8px; } .carousel-dots { padding: 0.5rem; gap: 6px; } .carousel-dot { width: 8px; height: 8px; } .carousel-slide .slide-title { font-size: 0.85rem; left: 12px; bottom: 12px; } .carousel-slide .slide-title span { font-size: 0.65rem; } .programacion-tabla { font-size: 0.5rem; min-width: 500px; } .programacion-tabla th { font-size: 0.55rem; padding: 4px 3px; } .programacion-tabla td { padding: 3px 2px; font-size: 0.5rem; } .programacion-tabla .celda-programa .nombre-programa { font-size: 0.5rem; } .leyenda { font-size: 0.65rem; gap: 0.8rem; } .dia-actual th::after { font-size: 0.4rem; } }
+    .reloj-tiempo-real { font-size: 0.8rem; font-weight: 600; color: #1f2937; background: #f3f4f6; padding: 4px 12px; border-radius: 20px; display: inline-block; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  
+  <button id="menu-toggle" aria-label="Abrir menú" style="position:fixed;left:12px;top:12px;z-index:9999;background:transparent;border:0;color:#111;font-size:1.2rem;cursor:pointer;">
+    <span style="display:block;line-height:4px">—</span>
+    <span style="display:block;line-height:4px">—</span>
+    <span style="display:block;line-height:4px">—</span>
+  </button>
+
+  <div id="overlay-login" style="position:fixed;left:12px;top:48px;z-index:9998;display:none;background:rgba(255,255,255,0.95);padding:8px 12px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);">
+    <a href="?page=login" style="color:#111;text-decoration:none;font-weight:600

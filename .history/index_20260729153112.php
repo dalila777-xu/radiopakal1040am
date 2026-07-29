@@ -2,7 +2,7 @@
 // ==========================================
 // CONFIGURACIÓN DE SUPABASE (INTEGRADA)
 // ==========================================
-define('SUPABASE_URL', 'https://cwfydsatojsahuojvt.supabase.co'); // Esto ya no se usa, pero déjalo
+define('SUPABASE_URL', 'https://cwfydsatojsahuojvt.supabase.com'); // Esto ya no se usa, pero déjalo
 define('SUPABASE_KEY', 'srv-d9k2em942hec739uki40'); // PON TU CLAVE REAL AQUÍ
 
 /**

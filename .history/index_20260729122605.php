@@ -2,18 +2,14 @@
 // ==========================================
 // CONFIGURACIÓN DE SUPABASE (INTEGRADA)
 // ==========================================
-define('SUPABASE_URL', 'https://cwfydsatojsahuojvt.supabase.co'); // Esto ya no se usa, pero déjalo
-define('SUPABASE_KEY', 'srv-d9k2em942hec739uki40'); // PON TU CLAVE REAL AQUÍ
+define('SUPABASE_URL', 'https://cwfydsatojsahuojvt.supabase.co');
+define('SUPABASE_KEY', 'sb_publishable_y-xMjQxSFvPaMusgSkT8Gg_9iFBM...'); // <--- ¡CAMBIALO POR TU CLAVE COMPLETA!
 
 /**
  * Función para hacer peticiones mediante la API REST de Supabase
  */
 function supabaseRequest($endpoint, $method = 'GET', $data = null, $queryParams = null) {
-    // ⚠️ CAMBIA ESTA IP POR LA IP REAL DE TU SERVIDOR SUPABASE
-    $ip_servidor = '52.204.xxx.xxx'; // <--- PON AQUÍ LA IP QUE SACASTE DEL PING
-    
-    // Usamos la IP directa en lugar del dominio
-    $url = 'https://' . $ip_servidor . '/rest/v1/' . $endpoint;
+    $url = SUPABASE_URL . '/rest/v1/' . $endpoint;
     
     if ($queryParams) {
         $url .= '?' . $queryParams;
@@ -31,10 +27,6 @@ function supabaseRequest($endpoint, $method = 'GET', $data = null, $queryParams 
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    
-    // 🔥 ESTO PERMITE CONECTARSE A LA IP SIN CERTIFICADO SSL
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
 
     if ($data && ($method == 'POST' || $method == 'PATCH' || $method == 'PUT')) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
