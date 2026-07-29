@@ -5,50 +5,7 @@ if (!isset($_SESSION['usuario'])) {
     header("Location: index.php");
     exit();
 }
-
-// Configuración de la API de Supabase para Radio Pakal
-define('SUPABASE_URL', 'https://cwfydsatojsahuojvt.supabase.co');
-define('SUPABASE_KEY', 'sb_publishable_y-xMjQxSFvPaMusgSkT8Gg_9iFBM...'); 
-
-/**
- * Función para hacer peticiones mediante la API URL (REST) de Supabase
- */
-function supabaseRequest($endpoint, $method = 'GET', $data = null, $queryParams = null) {
-    $url = SUPABASE_URL . '/rest/v1/' . $endpoint;
-    
-    if ($queryParams) {
-        $url .= '?' . $queryParams;
-    }
-
-    $ch = curl_init($url);
-
-    $headers = [
-        'apikey: ' . SUPABASE_KEY,
-        'Authorization: Bearer ' . SUPABASE_KEY,
-        'Content-Type: application/json',
-        'Prefer: return=representation'
-    ];
-
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-    if ($data && ($method == 'POST' || $method == 'PATCH' || $method == 'PUT')) {
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    }
-
-    $response = curl_exec($ch);
-    
-    if (curl_errno($ch)) {
-        $error = curl_error($ch);
-        curl_close($ch);
-        die("Error en la petición cURL a Supabase: " . $error);
-    }
-    
-    curl_close($ch);
-
-    return json_decode($response, true);
-}
+include("db.php");
 
 // Manejar cierre de sesión desde este mismo archivo (logout)
 if (isset($_GET['logout'])) {
@@ -76,7 +33,7 @@ if (isset($_GET['logout'])) {
         body { font-family: sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
         
         /* ========================================
-            BARRA DE BIENVENIDA MODERNA Y ESTÉTICA
+           BARRA DE BIENVENIDA MODERNA Y ESTÉTICA
         ======================================== */
         .nav-admin { 
             background: #0099FF; 
@@ -153,13 +110,13 @@ if (isset($_GET['logout'])) {
         }
 
         /* ========================================
-            ESTILOS DE MÓDULOS Y CONTENIDO
+           ESTILOS DE MÓDULOS Y CONTENIDO
         ======================================== */
         .grid-modulos { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
         .card-modulo { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 4px solid #0099FF; }
         .card-modulo h3 { margin-top: 0; color: #000000; }
         .btn-action { display: inline-block; background: #0099FF; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; font-size: 0.9rem; margin-top: 10px; transition: all 0.3s ease; }
-        .btn-action:hover { background: #0077CC; box-shadow: 0 4px 8px rgba(0, 153, 255, 0.3); }
+        .btn-action:hover { background: #0099FF; box-shadow: 0 4px 8px rgba(0, 153, 255, 0.3); }
     </style>
 </head>
 <body>
@@ -204,6 +161,7 @@ if (isset($_GET['logout'])) {
         <div class="card-modulo">
             <h3><i class="fas fa-images"></i> Imágenes del Carrusel</h3>
             <p>Cambia las fotos de la marquesina principal del sitio.</p>
+            <!-- Enlazado al archivo admin_carrusel.php según solicitud -->
             <a href="admin_carrusel.php" class="btn-action">Administrar Fotos</a>
         </div>
     </div>

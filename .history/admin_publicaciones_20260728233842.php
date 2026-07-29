@@ -4,50 +4,7 @@ if (!isset($_SESSION['usuario'])) {
     header("Location: index.php");
     exit();
 }
-
-// Configuración de la API de Supabase para Radio Pakal
-define('SUPABASE_URL', 'https://cwfydsatojsahuojvt.supabase.co');
-define('SUPABASE_KEY', 'sb_publishable_y-xMjQxSFvPaMusgSkT8Gg_9iFBM...'); 
-
-/**
- * Función para hacer peticiones mediante la API URL (REST) de Supabase
- */
-function supabaseRequest($endpoint, $method = 'GET', $data = null, $queryParams = null) {
-    $url = SUPABASE_URL . '/rest/v1/' . $endpoint;
-    
-    if ($queryParams) {
-        $url .= '?' . $queryParams;
-    }
-
-    $ch = curl_init($url);
-
-    $headers = [
-        'apikey: ' . SUPABASE_KEY,
-        'Authorization: Bearer ' . SUPABASE_KEY,
-        'Content-Type: application/json',
-        'Prefer: return=representation'
-    ];
-
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-    if ($data && ($method == 'POST' || $method == 'PATCH' || $method == 'PUT')) {
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    }
-
-    $response = curl_exec($ch);
-    
-    if (curl_errno($ch)) {
-        $error = curl_error($ch);
-        curl_close($ch);
-        die("Error en la petición cURL a Supabase: " . $error);
-    }
-    
-    curl_close($ch);
-
-    return json_decode($response, true);
-}
+include("db.php");
 
 $mensaje = "";
 $upload_dir = 'uploads/noticias/';
@@ -57,11 +14,11 @@ if (!is_dir($upload_dir)) {
 
 // --- ACCIÓN 1: SUBIR NUEVA PUBLICACIÓN ---
 if (isset($_POST['agregar_post'])) {
-    $titulo = trim($_POST['titulo'] ?? '');
-    $contenido = trim($_POST['contenido'] ?? '');
+    $titulo = mysqli_real_escape_string($conn, $_POST['titulo'] ?? '');
+    $contenido = mysqli_real_escape_string($conn, $_POST['contenido'] ?? '');
     
     $session_autor = $_SESSION['nombre'] ?? $_SESSION['usuario'] ?? 'Administrador';
-    $autor = $session_autor; 
+    $autor = mysqli_real_escape_string($conn, $session_autor); 
     $imagen_path = '';
     $error_mensaje = '';
 
@@ -77,7 +34,7 @@ if (isset($_POST['agregar_post'])) {
                 $destino = $upload_dir . $filename;
 
                 if (move_uploaded_file($tmp_name, $destino)) {
-                    $imagen_path = $destino;
+                    $imagen_path = mysqli_real_escape_string($conn, $destino);
                 } else {
                     $error_mensaje = "❌ No se pudo subir la imagen.";
                 }
@@ -87,20 +44,11 @@ if (isset($_POST['agregar_post'])) {
         }
 
         if (empty($error_mensaje)) {
-            $nuevo_post = [
-                'titulo' => $titulo,
-                'contenido' => $contenido,
-                'autor' => $autor,
-                'imagen' => $imagen_path,
-                'fecha_creacion' => date('c') // Formato ISO 8601 para Supabase/PostgreSQL
-            ];
-
-            $resultado = supabaseRequest('publicaciones', 'POST', $nuevo_post);
-            
-            if ($resultado !== null && !isset($resultado['code'])) {
-                $mensaje = "<div class='alert success'>✨ Publicación subida con éxito a Supabase.</div>";
+            $query = "INSERT INTO publicaciones (titulo, contenido, autor, imagen, fecha_creacion) VALUES ('$titulo', '$contenido', '$autor', '$imagen_path', NOW())";
+            if (mysqli_query($conn, $query)) {
+                $mensaje = "<div class='alert success'>✨ Publicación subida con éxito al Index.</div>";
             } else {
-                $mensaje = "<div class='alert error'>❌ Error al publicar en Supabase.</div>";
+                $mensaje = "<div class='alert error'>❌ Error al publicar: " . mysqli_error($conn) . "</div>";
             }
         } else {
             $mensaje = "<div class='alert error'>$error_mensaje</div>";
@@ -114,17 +62,16 @@ if (isset($_POST['agregar_post'])) {
 if (isset($_GET['eliminar'])) {
     $id = intval($_GET['eliminar']);
     if ($id > 0) {
-        // Obtener la imagen para borrarla del servidor local si existe
-        $posts_actuales = supabaseRequest('publicaciones', 'GET', null, 'id=eq.' . $id);
-        if (!empty($posts_actuales)) {
-            $img_antigua = $posts_actuales[0]['imagen'] ?? '';
-            if (!empty($img_antigua) && file_exists($img_antigua)) {
-                @unlink($img_antigua);
+        $res_img = mysqli_query($conn, "SELECT imagen FROM publicaciones WHERE id = $id");
+        if ($res_img && mysqli_num_rows($res_img) > 0) {
+            $row_img = mysqli_fetch_assoc($res_img);
+            if (!empty($row_img['imagen']) && file_exists($row_img['imagen'])) {
+                @unlink($row_img['imagen']);
             }
         }
 
-        $resultado = supabaseRequest('publicaciones', 'DELETE', null, 'id=eq.' . $id);
-        if ($resultado !== false) {
+        $query = "DELETE FROM publicaciones WHERE id = $id";
+        if (mysqli_query($conn, $query)) {
             $mensaje = "<div class='alert success'>🗑️ Post eliminado correctamente.</div>";
         } else {
             $mensaje = "<div class='alert error'>❌ Error al eliminar el registro.</div>";
@@ -135,10 +82,10 @@ if (isset($_GET['eliminar'])) {
 // --- ACCIÓN 3: ACTUALIZAR PUBLICACIÓN ---
 if (isset($_POST['actualizar_post'])) {
     $id = intval($_POST['id'] ?? 0);
-    $titulo = trim($_POST['titulo'] ?? '');
-    $contenido = trim($_POST['contenido'] ?? '');
+    $titulo = mysqli_real_escape_string($conn, $_POST['titulo'] ?? '');
+    $contenido = mysqli_real_escape_string($conn, $_POST['contenido'] ?? '');
     $imagen_actual = $_POST['imagen_actual'] ?? '';
-    $imagen_path = $imagen_actual;
+    $imagen_path = mysqli_real_escape_string($conn, $imagen_actual);
     $error_mensaje = '';
 
     if ($id > 0 && !empty($titulo) && !empty($contenido)) {
@@ -156,7 +103,7 @@ if (isset($_POST['actualizar_post'])) {
                     if (!empty($imagen_actual) && file_exists($imagen_actual)) {
                         @unlink($imagen_actual);
                     }
-                    $imagen_path = $destino;
+                    $imagen_path = mysqli_real_escape_string($conn, $destino);
                 } else {
                     $error_mensaje = "❌ No se pudo subir la imagen.";
                 }
@@ -166,18 +113,16 @@ if (isset($_POST['actualizar_post'])) {
         }
 
         if (empty($error_mensaje)) {
-            $datos_actualizados = [
-                'titulo' => $titulo,
-                'contenido' => $contenido,
-                'imagen' => $imagen_path
-            ];
+            $query = "UPDATE publicaciones SET titulo = '$titulo', contenido = '$contenido'";
+            if (!empty($imagen_path)) {
+                $query .= ", imagen = '$imagen_path'";
+            }
+            $query .= " WHERE id = $id";
 
-            $resultado = supabaseRequest('publicaciones', 'PATCH', $datos_actualizados, 'id=eq.' . $id);
-
-            if ($resultado !== null && !isset($resultado['code'])) {
-                $mensaje = "<div class='alert success'>🔄 Post actualizado correctamente en Supabase.</div>";
+            if (mysqli_query($conn, $query)) {
+                $mensaje = "<div class='alert success'>🔄 Post actualizado correctamente en la web.</div>";
             } else {
-                $mensaje = "<div class='alert error'>❌ Error al actualizar.</div>";
+                $mensaje = "<div class='alert error'>❌ Error al actualizar: " . mysqli_error($conn) . "</div>";
             }
         } else {
             $mensaje = "<div class='alert error'>$error_mensaje</div>";
@@ -198,9 +143,9 @@ if (isset($_GET['editar'])) {
     $id_editar = intval($_GET['editar']);
     if ($id_editar > 0) {
         $edit_mode = true;
-        $posts_edit = supabaseRequest('publicaciones', 'GET', null, 'id=eq.' . $id_editar);
-        if (!empty($posts_edit)) {
-            $row_edit = $posts_edit[0];
+        $res_edit = mysqli_query($conn, "SELECT * FROM publicaciones WHERE id = $id_editar");
+        if ($res_edit && mysqli_num_rows($res_edit) > 0) {
+            $row_edit = mysqli_fetch_assoc($res_edit);
             $edit_id = $row_edit['id'];
             $edit_titulo = $row_edit['titulo'] ?? '';
             $edit_contenido = $row_edit['contenido'] ?? '';
@@ -216,7 +161,7 @@ if (isset($_GET['editar'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Control | Administrar Publicaciones</title>
+    <title>Administrar Publicaciones | Panel de Control</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
@@ -442,11 +387,9 @@ if (isset($_GET['editar'])) {
     
     <div class="grid-publicaciones">
         <?php
-        // Obtener publicaciones ordenadas de forma descendente por ID usando Supabase REST (order=id.desc)
-        $posts = supabaseRequest('publicaciones', 'GET', null, 'order=id.desc');
-        
-        if (!empty($posts) && is_array($posts) && !isset($posts['code'])) {
-            foreach ($posts as $row) {
+        $res = mysqli_query($conn, "SELECT * FROM publicaciones ORDER BY id DESC");
+        if ($res && mysqli_num_rows($res) > 0) {
+            while ($row = mysqli_fetch_assoc($res)) {
                 $fecha_formateada = (!empty($row['fecha_creacion'])) ? date('d/m/Y', strtotime($row['fecha_creacion'])) : 'Reciente';
                 $contenido_corto = !empty($row['contenido']) ? substr(strip_tags($row['contenido']), 0, 120) : 'Sin contenido';
 
@@ -474,7 +417,7 @@ if (isset($_GET['editar'])) {
                 echo "</div>";
             }
         } else {
-            echo "<div class='sin-publicaciones'>📭 No hay publicaciones registradas aún o la tabla está vacía.</div>";
+            echo "<div class='sin-publicaciones'>📭 No hay publicaciones registradas aún.</div>";
         }
         ?>
     </div>

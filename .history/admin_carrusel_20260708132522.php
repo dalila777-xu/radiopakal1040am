@@ -17,7 +17,7 @@ if (!file_exists('uploads')) {
 // ACCIÓN: SUBIR NUEVA IMAGEN
 // ==========================================
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['subir_imagen'])) {
-    $titulo = $_POST['titulo'] ?? 'Panel de Control';
+    $titulo = mysqli_real_escape_string($conn, $_POST['titulo'] ?? 'Radio Pakal');
     
     if (isset($_FILES['foto_carrusel']) && $_FILES['foto_carrusel']['error'] == 0) {
         $filename = $_FILES['foto_carrusel']['name'];
@@ -33,20 +33,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['subir_imagen'])) {
             $ruta_destino = "uploads/" . $nuevo_nombre;
             
             if (move_uploaded_file($_FILES['foto_carrusel']['tmp_name'], $ruta_destino)) {
+                // ✅ CORREGIDO: Incluir usuario_id
                 $usuario_id = $_SESSION['usuario_id'] ?? 1;
-                
-                $data = [
-                    'titulo' => $titulo,
-                    'ruta_imagen' => $ruta_destino,
-                    'usuario_id' => $usuario_id
-                ];
-                
-                $response = supabaseRequest('carrusel', 'POST', $data);
-                
-                if (is_array($response)) {
+                $query = "INSERT INTO carrusel (titulo, ruta_imagen, usuario_id) VALUES ('$titulo', '$ruta_destino', '$usuario_id')";
+                if (mysqli_query($conn, $query)) {
                     $mensaje = "<div class='alert success'>📸 Imagen subida correctamente.</div>";
                 } else {
-                    $mensaje = "<div class='alert error'>❌ Error al guardar en la BD de Supabase.</div>";
+                    $mensaje = "<div class='alert error'>❌ Error al guardar en la BD: " . mysqli_error($conn) . "</div>";
                 }
             } else {
                 $mensaje = "<div class='alert error'>❌ Error al mover el archivo al servidor.</div>";
@@ -62,13 +55,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['subir_imagen'])) {
 // ==========================================
 if (isset($_POST['actualizar_titulo'])) {
     $id = intval($_POST['id'] ?? 0);
-    $titulo = $_POST['titulo'] ?? '';
+    $titulo = mysqli_real_escape_string($conn, $_POST['titulo'] ?? '');
     
     if ($id > 0 && !empty($titulo)) {
-        $data = ['titulo' => $titulo];
-        $response = supabaseRequest('carrusel', 'PATCH', $data, "id=eq.$id");
-        
-        $mensaje = "<div class='alert success'>✏️ Título actualizado correctamente.</div>";
+        $query = "UPDATE carrusel SET titulo = '$titulo' WHERE id = $id";
+        if (mysqli_query($conn, $query)) {
+            $mensaje = "<div class='alert success'>✏️ Título actualizado correctamente.</div>";
+        } else {
+            $mensaje = "<div class='alert error'>❌ Error al actualizar el título: " . mysqli_error($conn) . "</div>";
+        }
     } else {
         $mensaje = "<div class='alert error'>❌ Datos incompletos para actualizar.</div>";
     }
@@ -80,29 +75,19 @@ if (isset($_POST['actualizar_titulo'])) {
 if (isset($_GET['eliminar'])) {
     $id_eliminar = (int)$_GET['eliminar'];
     
-    // 1. Obtener la ruta para borrar el archivo físico
-    $res_img = supabaseRequest('carrusel', 'GET', null, "id=eq.$id_eliminar&select=ruta_imagen");
-    if (!empty($res_img) && isset($res_img[0]['ruta_imagen'])) {
-        $ruta_imagen = $res_img[0]['ruta_imagen'];
-        if (!empty($ruta_imagen) && file_exists($ruta_imagen)) {
-            unlink($ruta_imagen); 
+    $res_img = mysqli_query($conn, "SELECT ruta_imagen FROM carrusel WHERE id = $id_eliminar");
+    if ($row_img = mysqli_fetch_assoc($res_img)) {
+        if (!empty($row_img['ruta_imagen']) && file_exists($row_img['ruta_imagen'])) {
+            unlink($row_img['ruta_imagen']); 
         }
     }
     
-    // 2. Eliminar registro mediante la API REST de Supabase
-    supabaseRequest('carrusel', 'DELETE', null, "id=eq.$id_eliminar");
-    
+    mysqli_query($conn, "DELETE FROM carrusel WHERE id = $id_eliminar");
     header("Location: admin_carrusel.php");
     exit();
 }
 
-// ==========================================
-// OBTENER TODAS LAS IMÁGENES
-// ==========================================
-$imagenes_carrusel = supabaseRequest('carrusel', 'GET', null, "order=id.desc");
-if (!is_array($imagenes_carrusel)) {
-    $imagenes_carrusel = [];
-}
+$imagenes_carrusel = mysqli_query($conn, "SELECT * FROM carrusel ORDER BY id DESC");
 
 // ==========================================
 // OBTENER DATOS PARA EDITAR (si se pasa editar)
@@ -114,9 +99,9 @@ $edit_titulo = "";
 if (isset($_GET['editar'])) {
     $id_editar = intval($_GET['editar']);
     if ($id_editar > 0) {
-        $res_edit = supabaseRequest('carrusel', 'GET', null, "id=eq.$id_editar");
-        if (!empty($res_edit) && is_array($res_edit)) {
-            $row_edit = $res_edit[0];
+        $res_edit = mysqli_query($conn, "SELECT * FROM carrusel WHERE id = $id_editar");
+        if ($res_edit && mysqli_num_rows($res_edit) > 0) {
+            $row_edit = mysqli_fetch_assoc($res_edit);
             $edit_mode = true;
             $edit_id = $row_edit['id'];
             $edit_titulo = $row_edit['titulo'] ?? '';
@@ -128,7 +113,7 @@ if (isset($_GET['editar'])) {
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Administrar Carrusel | Panel de Control</title>
+    <title>Administrar Carrusel | Radio Pakal</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
@@ -454,7 +439,7 @@ if (isset($_GET['editar'])) {
             </div>
             <div class="form-group">
                 <label>Título o descripción corta:</label>
-                <input type="text" name="titulo" placeholder="Ej. Transmisión Especial del Día" value="Panel de Control">
+                <input type="text" name="titulo" placeholder="Ej. Transmisión Especial del Día" value="Radio Pakal 1040 AM">
             </div>
             <button type="submit" name="subir_imagen" class="btn-submit"><i class="fas fa-upload"></i> Subir al Carrusel</button>
         </form>
@@ -463,15 +448,15 @@ if (isset($_GET['editar'])) {
     <h3 class="section-title"><i class="fas fa-images"></i> Imágenes Activas</h3>
     
     <div class="grid-imagenes">
-        <?php if (!empty($imagenes_carrusel)): ?>
-            <?php foreach ($imagenes_carrusel as $img): ?>
+        <?php if (mysqli_num_rows($imagenes_carrusel) > 0): ?>
+            <?php while($img = mysqli_fetch_assoc($imagenes_carrusel)): ?>
                 <div class="img-card">
                     <div class="img-container">
                         <img src="<?php echo htmlspecialchars($img['ruta_imagen']); ?>" alt="<?php echo htmlspecialchars($img['titulo']); ?>">
                     </div>
                     <div class="info">
                         <div class="titulo"><?php echo htmlspecialchars($img['titulo']); ?></div>
-                        <small><i class="far fa-calendar-alt"></i> <?php echo file_exists($img['ruta_imagen']) ? date('d/m/Y', filemtime($img['ruta_imagen'])) : 'Fecha desconocida'; ?></small>
+                        <small><i class="far fa-calendar-alt"></i> <?php echo date('d/m/Y', filemtime($img['ruta_imagen'])); ?></small>
                         <div class="post-actions">
                             <a href="admin_carrusel.php?editar=<?php echo $img['id']; ?>" class="btn-edit" onclick="event.preventDefault(); abrirModal(<?php echo $img['id']; ?>, '<?php echo htmlspecialchars(addslashes($img['titulo'])); ?>');">
                                 <i class="fas fa-edit"></i> Editar
@@ -482,7 +467,7 @@ if (isset($_GET['editar'])) {
                         </div>
                     </div>
                 </div>
-            <?php endforeach; ?>
+            <?php endwhile; ?>
         <?php else: ?>
             <div class="sin-imagenes">📭 No hay imágenes en el carrusel. Sube una nueva.</div>
         <?php endif; ?>

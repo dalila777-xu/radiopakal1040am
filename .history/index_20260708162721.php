@@ -1,5 +1,5 @@
 <?php 
-include("bd.php"); 
+include("db.php"); 
 session_start();
 
 // ==========================================
@@ -67,7 +67,7 @@ function obtenerIndicadorTransmision($diaPrograma, $horaPrograma, $nombreProgram
 }
 
 // ==========================================
-// MANEJO DE LOGIN (CONSULTA A SUPABASE)
+// MANEJO DE LOGIN
 // ==========================================
 if (isset($_SESSION['usuario'])) {
   if (isset($_GET['page']) && $_GET['page'] === 'login') {
@@ -77,16 +77,14 @@ if (isset($_SESSION['usuario'])) {
 
 $login_error = "";
 if ($_SERVER["REQUEST_METHOD"] === 'POST' && isset($_POST['login_action'])) {
-  $usuario = $_POST['usuario'] ?? '';
+  $usuario = mysqli_real_escape_string($conn, $_POST['usuario'] ?? '');
   $password = $_POST['password'] ?? '';
 
   if (!empty($usuario) && !empty($password)) {
-    // Buscar usuario en Supabase (tabla 'usuarios')
-    $queryParams = 'usuario=eq.' . urlencode($usuario);
-    $user_data_array = supabaseRequest('usuarios', 'GET', null, $queryParams);
-    
-    if (!empty($user_data_array) && is_array($user_data_array) && count($user_data_array) > 0) {
-      $user_data = $user_data_array[0]; // Supabase devuelve un array de objetos
+    $query = "SELECT * FROM usuarios WHERE usuario = '$usuario' LIMIT 1";
+    $result = mysqli_query($conn, $query);
+    if ($result && mysqli_num_rows($result) > 0) {
+      $user_data = mysqli_fetch_assoc($result);
       if ($password === $user_data['password']) {
         $_SESSION['usuario'] = $user_data['usuario'];
         $_SESSION['nombre'] = $user_data['nombre'] ?? $user_data['usuario'];
@@ -151,32 +149,51 @@ if (isset($_GET['page']) && $_GET['page'] === 'login') {
 }
 
 // ==========================================
-// CONSULTAS A SUPABASE
+// CONSULTAS A LA BASE DE DATOS
 // ==========================================
 
-// Obtener todos los programas (tabla 'programacion')
-$programas = supabaseRequest('programacion', 'GET');
-
-// Obtener horarios únicos desde la tabla 'programacion'
-$horarios_data = supabaseRequest('programacion', 'GET', null, 'select=hora&order=hora.asc');
-$horarios = [];
-if (!empty($horarios_data) && is_array($horarios_data)) {
-    foreach ($horarios_data as $row) {
-        if (!in_array($row['hora'], $horarios)) {
-            $horarios[] = $row['hora'];
-        }
+// Obtener todos los programas
+$query = "SELECT * FROM programacion ORDER BY id";
+$result = mysqli_query($conn, $query);
+$programas = [];
+if ($result && mysqli_num_rows($result) > 0) {
+    while ($row = mysqli_fetch_assoc($result)) {
+        $programas[] = $row;
     }
 }
 
-// Obtener imágenes del carrusel (tabla 'carrusel')
-$carrusel_imagenes = supabaseRequest('carrusel', 'GET', null, 'order=id.desc');
-
-// Obtener publicaciones (tabla 'publicaciones') - limitar a 6
-$publicaciones = supabaseRequest('publicaciones', 'GET', null, 'order=id.desc&limit=6');
+// Obtener horarios únicos
+$query_horarios = "SELECT DISTINCT hora FROM programacion ORDER BY hora";
+$result_horarios = mysqli_query($conn, $query_horarios);
+$horarios = [];
+if ($result_horarios && mysqli_num_rows($result_horarios) > 0) {
+    while ($row = mysqli_fetch_assoc($result_horarios)) {
+        $horarios[] = $row['hora'];
+    }
+}
 
 // ==========================================
-// FUNCIÓN AUXILIAR PARA IMAGEN DE PUBLICACIÓN
+// CONSULTA PARA EL CARRUSEL (DESDE BASE DE DATOS)
 // ==========================================
+$query_carrusel = "SELECT * FROM carrusel ORDER BY id DESC";
+$result_carrusel = mysqli_query($conn, $query_carrusel);
+$carrusel_imagenes = [];
+if ($result_carrusel && mysqli_num_rows($result_carrusel) > 0) {
+    while ($row = mysqli_fetch_assoc($result_carrusel)) {
+        $carrusel_imagenes[] = $row;
+    }
+}
+
+// Obtener publicaciones
+$query_publicaciones = "SELECT * FROM publicaciones ORDER BY id DESC LIMIT 6";
+$result_publicaciones = mysqli_query($conn, $query_publicaciones);
+$publicaciones = [];
+if ($result_publicaciones && mysqli_num_rows($result_publicaciones) > 0) {
+    while ($row = mysqli_fetch_assoc($result_publicaciones)) {
+        $publicaciones[] = $row;
+    }
+}
+
 function obtenerImagenPublicacion($publicacion) {
     $campos = ['imagen', 'foto', 'imagen_url', 'url_imagen', 'img', 'portada', 'foto_principal', 'image', 'cover'];
 

@@ -4,25 +4,25 @@ session_start();
 
 // Si ya tiene una sesión activa, redirigir directo al panel de administración
 if (isset($_SESSION['usuario'])) {
-    header("Location: admin.php");
+    header("Location: login.php");
     exit();
 }
 
 $error = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $usuario = trim($_POST['usuario']);
-    $password = $_POST['password'];
+    $usuario = mysqli_real_escape_string($conn, $_POST['usuario']);
+    $password = $_POST['password']; // Contraseña en texto plano temporalmente o para verificar
 
     if (!empty($usuario) && !empty($password)) {
-        // Buscamos al usuario en Supabase filtrando por el campo 'usuario'
-        // Equivale a: SELECT * FROM usuarios WHERE usuario = '$usuario' LIMIT 1
-        $resultado = supabaseRequest('usuarios', 'GET', null, 'usuario=eq.' . urlencode($usuario) . '&limit=1');
+        // Buscamos al usuario en la base de datos
+        $query = "SELECT * FROM usuarios WHERE usuario = '$usuario' LIMIT 1";
+        $result = mysqli_query($conn, $query);
 
-        if (!empty($resultado) && is_array($resultado)) {
-            $user_data = $resultado[0];
+        if ($result && mysqli_num_rows($result) > 0) {
+            $user_data = mysqli_fetch_assoc($result);
             
-            // Verificación: Soporta tanto contraseñas con hash (bcrypt) como texto plano
+            // Verificación: Soporta tanto contraseñas con hash (md5/sha1/bcrypt) como texto plano según cómo las hayas guardado
             if ($password === $user_data['password'] || password_verify($password, $user_data['password'])) {
                 $_SESSION['usuario'] = $user_data['usuario'];
                 $_SESSION['nombre'] = $user_data['nombre'] ?? $user_data['usuario'];
@@ -44,7 +44,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Control | Radio Pakal</title>
+    <title>Iniciar Sesión | Radio Pakal</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>

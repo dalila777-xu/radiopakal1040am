@@ -4,6 +4,7 @@ if (!isset($_SESSION['usuario'])) {
     header("Location: index.php");
     exit();
 }
+// Asegúrate de que tu db.php ahora use PDO para conectarse a Supabase (PostgreSQL)
 include("db.php");
 
 $mensaje = "";
@@ -35,18 +36,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['subir_imagen'])) {
             if (move_uploaded_file($_FILES['foto_carrusel']['tmp_name'], $ruta_destino)) {
                 $usuario_id = $_SESSION['usuario_id'] ?? 1;
                 
-                $data = [
-                    'titulo' => $titulo,
-                    'ruta_imagen' => $ruta_destino,
-                    'usuario_id' => $usuario_id
-                ];
-                
-                $response = supabaseRequest('carrusel', 'POST', $data);
-                
-                if (is_array($response)) {
+                // Preparar consulta para Supabase (PostgreSQL)
+                try {
+                    $stmt = $conn->prepare("INSERT INTO carrusel (titulo, ruta_imagen, usuario_id) VALUES (:titulo, :ruta, :usuario)");
+                    $stmt->execute([
+                        ':titulo' => $titulo,
+                        ':ruta' => $ruta_destino,
+                        ':usuario' => $usuario_id
+                    ]);
                     $mensaje = "<div class='alert success'>📸 Imagen subida correctamente.</div>";
-                } else {
-                    $mensaje = "<div class='alert error'>❌ Error al guardar en la BD de Supabase.</div>";
+                } catch (PDOException $e) {
+                    $mensaje = "<div class='alert error'>❌ Error al guardar en la BD: " . $e->getMessage() . "</div>";
                 }
             } else {
                 $mensaje = "<div class='alert error'>❌ Error al mover el archivo al servidor.</div>";
@@ -65,10 +65,13 @@ if (isset($_POST['actualizar_titulo'])) {
     $titulo = $_POST['titulo'] ?? '';
     
     if ($id > 0 && !empty($titulo)) {
-        $data = ['titulo' => $titulo];
-        $response = supabaseRequest('carrusel', 'PATCH', $data, "id=eq.$id");
-        
-        $mensaje = "<div class='alert success'>✏️ Título actualizado correctamente.</div>";
+        try {
+            $stmt = $conn->prepare("UPDATE carrusel SET titulo = :titulo WHERE id = :id");
+            $stmt->execute([':titulo' => $titulo, ':id' => $id]);
+            $mensaje = "<div class='alert success'>✏️ Título actualizado correctamente.</div>";
+        } catch (PDOException $e) {
+            $mensaje = "<div class='alert error'>❌ Error al actualizar el título: " . $e->getMessage() . "</div>";
+        }
     } else {
         $mensaje = "<div class='alert error'>❌ Datos incompletos para actualizar.</div>";
     }
@@ -80,17 +83,24 @@ if (isset($_POST['actualizar_titulo'])) {
 if (isset($_GET['eliminar'])) {
     $id_eliminar = (int)$_GET['eliminar'];
     
-    // 1. Obtener la ruta para borrar el archivo físico
-    $res_img = supabaseRequest('carrusel', 'GET', null, "id=eq.$id_eliminar&select=ruta_imagen");
-    if (!empty($res_img) && isset($res_img[0]['ruta_imagen'])) {
-        $ruta_imagen = $res_img[0]['ruta_imagen'];
-        if (!empty($ruta_imagen) && file_exists($ruta_imagen)) {
-            unlink($ruta_imagen); 
+    try {
+        // 1. Obtener la ruta para borrar el archivo físico
+        $stmt_img = $conn->prepare("SELECT ruta_imagen FROM carrusel WHERE id = :id");
+        $stmt_img->execute([':id' => $id_eliminar]);
+        
+        if ($row_img = $stmt_img->fetch(PDO::FETCH_ASSOC)) {
+            if (!empty($row_img['ruta_imagen']) && file_exists($row_img['ruta_imagen'])) {
+                unlink($row_img['ruta_imagen']); 
+            }
         }
+        
+        // 2. Eliminar registro de Supabase
+        $stmt_del = $conn->prepare("DELETE FROM carrusel WHERE id = :id");
+        $stmt_del->execute([':id' => $id_eliminar]);
+        
+    } catch (PDOException $e) {
+        // Manejar el error si es necesario
     }
-    
-    // 2. Eliminar registro mediante la API REST de Supabase
-    supabaseRequest('carrusel', 'DELETE', null, "id=eq.$id_eliminar");
     
     header("Location: admin_carrusel.php");
     exit();
@@ -99,9 +109,12 @@ if (isset($_GET['eliminar'])) {
 // ==========================================
 // OBTENER TODAS LAS IMÁGENES
 // ==========================================
-$imagenes_carrusel = supabaseRequest('carrusel', 'GET', null, "order=id.desc");
-if (!is_array($imagenes_carrusel)) {
-    $imagenes_carrusel = [];
+$imagenes_carrusel = [];
+try {
+    $stmt_all = $conn->query("SELECT * FROM carrusel ORDER BY id DESC");
+    $imagenes_carrusel = $stmt_all->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $mensaje = "<div class='alert error'>❌ Error al cargar imágenes: " . $e->getMessage() . "</div>";
 }
 
 // ==========================================
@@ -114,12 +127,18 @@ $edit_titulo = "";
 if (isset($_GET['editar'])) {
     $id_editar = intval($_GET['editar']);
     if ($id_editar > 0) {
-        $res_edit = supabaseRequest('carrusel', 'GET', null, "id=eq.$id_editar");
-        if (!empty($res_edit) && is_array($res_edit)) {
-            $row_edit = $res_edit[0];
-            $edit_mode = true;
-            $edit_id = $row_edit['id'];
-            $edit_titulo = $row_edit['titulo'] ?? '';
+        try {
+            $stmt_edit = $conn->prepare("SELECT * FROM carrusel WHERE id = :id");
+            $stmt_edit->execute([':id' => $id_editar]);
+            
+            if ($stmt_edit->rowCount() > 0) {
+                $row_edit = $stmt_edit->fetch(PDO::FETCH_ASSOC);
+                $edit_mode = true;
+                $edit_id = $row_edit['id'];
+                $edit_titulo = $row_edit['titulo'] ?? '';
+            }
+        } catch (PDOException $e) {
+            // Error handling
         }
     }
 }

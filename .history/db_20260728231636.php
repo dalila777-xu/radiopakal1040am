@@ -1,7 +1,7 @@
 <?php
 // Configuración de la API de Supabase para Radio Pakal
 define('SUPABASE_URL', 'https://cwfydsatojsahuojvt.supabase.co');
-define('SUPABASE_KEY', 'sb_publishable_y-xMjQxSFvPaMusgSkT8Gg_9iFBMRYr'); // Asegúrate de tener tu llave completa
+define('SUPABASE_KEY', 'sb_publishable_y-xMjQxSFvPaMusgSkT8Gg_9iFBM...'); // Asegúrate de pegar tu llave completa si es necesario
 
 /**
  * Función para hacer peticiones mediante la API URL (REST) de Supabase
@@ -44,7 +44,7 @@ function supabaseRequest($endpoint, $method = 'GET', $data = null, $queryParams 
         die("Error en la petición cURL a Supabase: " . $error);
     }
     
-    curl_close($ch); // Se cierra correctamente una sola vez al finalizar
+    curl_close($ch);
 
     return json_decode($response, true);
 }
