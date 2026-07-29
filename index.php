@@ -1,19 +1,18 @@
 <?php
 // ==========================================
-// CONFIGURACIÓN DE SUPABASE (INTEGRADA)
+// CONFIGURACIÓN DE SUPABASE (CORREGIDA)
 // ==========================================
-define('SUPABASE_URL', 'https://cwfydsatojsahuojvt.supabase.co'); // Esto ya no se usa, pero déjalo
-define('SUPABASE_KEY', 'srv-d9k2em942hec739uki40'); // PON TU CLAVE REAL AQUÍ
+// ✅ El dominio correcto es .co, NO .com
+define('SUPABASE_URL', 'https://cwfydsatojsahuojvt.supabase.co');
+// ✅ Cambia esto por tu clave ANON (la que empieza con eyJ...), NO la srv-
+define('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'); // <--- PON TU CLAVE ANON AQUÍ
 
 /**
  * Función para hacer peticiones mediante la API REST de Supabase
+ * (Sin IPs, sin errores de SSL)
  */
 function supabaseRequest($endpoint, $method = 'GET', $data = null, $queryParams = null) {
-    // ⚠️ CAMBIA ESTA IP POR LA IP REAL DE TU SERVIDOR SUPABASE
-    $ip_servidor = '52.204.xxx.xxx'; // <--- PON AQUÍ LA IP QUE SACASTE DEL PING
-    
-    // Usamos la IP directa en lugar del dominio
-    $url = 'https://' . $ip_servidor . '/rest/v1/' . $endpoint;
+    $url = SUPABASE_URL . '/rest/v1/' . $endpoint;
     
     if ($queryParams) {
         $url .= '?' . $queryParams;
@@ -32,9 +31,9 @@ function supabaseRequest($endpoint, $method = 'GET', $data = null, $queryParams 
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     
-    // 🔥 ESTO PERMITE CONECTARSE A LA IP SIN CERTIFICADO SSL
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    // 🔥 ESTO ARREGLA EL ERROR "TLS handshake failure"
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Desactiva la verificación del certificado
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); // Desactiva la verificación del host
 
     if ($data && ($method == 'POST' || $method == 'PATCH' || $method == 'PUT')) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
@@ -62,11 +61,7 @@ date_default_timezone_set('America/Mexico_City');
 // FUNCIÓN: OBTENER INDICADOR DE TRANSMISIÓN
 // ==========================================
 function obtenerIndicadorTransmision($diaPrograma, $horaPrograma, $nombrePrograma) {
-    $diasSemana = [
-        1 => 'Lunes', 2 => 'Martes', 3 => 'Miércoles', 
-        4 => 'Jueves', 5 => 'Viernes', 6 => 'Sábado', 7 => 'Domingo'
-    ];
-    
+    $diasSemana = [1 => 'Lunes', 2 => 'Martes', 3 => 'Miércoles', 4 => 'Jueves', 5 => 'Viernes', 6 => 'Sábado', 7 => 'Domingo'];
     $diaActualNum = (int)date('N');
     $diaActualNombre = $diasSemana[$diaActualNum];
     $horaActual = date('H:i');
@@ -74,21 +69,13 @@ function obtenerIndicadorTransmision($diaPrograma, $horaPrograma, $nombreProgram
     $diaCoincide = false;
     $diaProgramaNorm = mb_strtolower(trim($diaPrograma), 'UTF-8');
 
-    if ($diaProgramaNorm == 'lunes a viernes' && $diaActualNum >= 1 && $diaActualNum <= 5) {
-        $diaCoincide = true;
-    } elseif ($diaProgramaNorm == 'miércoles a viernes' && $diaActualNum >= 3 && $diaActualNum <= 5) {
-        $diaCoincide = true;
-    } elseif ($diaProgramaNorm == 'lunes a martes' && $diaActualNum >= 1 && $diaActualNum <= 2) {
-        $diaCoincide = true;
-    } elseif ($diaProgramaNorm == 'lunes a domingo' && $diaActualNum >= 1 && $diaActualNum <= 7) {
-        $diaCoincide = true;
-    } elseif ($diaProgramaNorm == 'lunes y miércoles' && ($diaActualNum == 1 || $diaActualNum == 3)) {
-        $diaCoincide = true;
-    } elseif ($diaProgramaNorm == 'lunes y jueves' && ($diaActualNum == 1 || $diaActualNum == 4)) {
-        $diaCoincide = true;
-    } elseif (strpos($diaProgramaNorm, mb_strtolower($diaActualNombre, 'UTF-8')) !== false) {
-        $diaCoincide = true;
-    }
+    if ($diaProgramaNorm == 'lunes a viernes' && $diaActualNum >= 1 && $diaActualNum <= 5) $diaCoincide = true;
+    elseif ($diaProgramaNorm == 'miércoles a viernes' && $diaActualNum >= 3 && $diaActualNum <= 5) $diaCoincide = true;
+    elseif ($diaProgramaNorm == 'lunes a martes' && $diaActualNum >= 1 && $diaActualNum <= 2) $diaCoincide = true;
+    elseif ($diaProgramaNorm == 'lunes a domingo' && $diaActualNum >= 1 && $diaActualNum <= 7) $diaCoincide = true;
+    elseif ($diaProgramaNorm == 'lunes y miércoles' && ($diaActualNum == 1 || $diaActualNum == 3)) $diaCoincide = true;
+    elseif ($diaProgramaNorm == 'lunes y jueves' && ($diaActualNum == 1 || $diaActualNum == 4)) $diaCoincide = true;
+    elseif (strpos($diaProgramaNorm, mb_strtolower($diaActualNombre, 'UTF-8')) !== false) $diaCoincide = true;
 
     if (!$diaCoincide) return ''; 
 
@@ -96,22 +83,18 @@ function obtenerIndicadorTransmision($diaPrograma, $horaPrograma, $nombreProgram
     if (count($partesHora) == 2) {
         $horaInicio = trim($partesHora[0]);
         $horaFin = trim($partesHora[1]);
-        
         $horaInicioMin = strtotime($horaInicio);
         $horaFinMin = strtotime($horaFin);
         $horaActualMin = strtotime($horaActual);
-        
         $minutosRestantesInicio = ($horaInicioMin - $horaActualMin) / 60;
         
         if ($minutosRestantesInicio > 0 && $minutosRestantesInicio <= 1) {
             return '<span class="lucesita luz-rojo" title="Comienza en 1 minuto"></span>';
         }
-        
         if ($horaActualMin >= $horaInicioMin && $horaActualMin < $horaFinMin) {
             return '<span class="lucesita luz-envivo" title="Al Aire"></span>';
         }
     }
-    
     return ''; 
 }
 
@@ -239,22 +222,13 @@ function obtenerProgramaEnCelda($programas, $dia, $hora) {
         if ($horaPrograma === $hora) {
             $diaProgramaNorm = mb_strtolower($diaPrograma, 'UTF-8');
             $diaNorm = mb_strtolower($dia, 'UTF-8');
-            
-            if ($diaProgramaNorm == 'lunes a viernes' && in_array($dia, ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'])) {
-                return $p;
-            } elseif ($diaProgramaNorm == 'lunes a domingo') {
-                return $p;
-            } elseif ($diaProgramaNorm == 'miércoles a viernes' && in_array($dia, ['Miércoles', 'Jueves', 'Viernes'])) {
-                return $p;
-            } elseif ($diaProgramaNorm == 'lunes a martes' && in_array($dia, ['Lunes', 'Martes'])) {
-                return $p;
-            } elseif ($diaProgramaNorm == 'lunes y miércoles' && in_array($dia, ['Lunes', 'Miércoles'])) {
-                return $p;
-            } elseif ($diaProgramaNorm == 'lunes y jueves' && in_array($dia, ['Lunes', 'Jueves'])) {
-                return $p;
-            } elseif (strpos($diaProgramaNorm, $diaNorm) !== false) {
-                return $p;
-            }
+            if ($diaProgramaNorm == 'lunes a viernes' && in_array($dia, ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'])) return $p;
+            elseif ($diaProgramaNorm == 'lunes a domingo') return $p;
+            elseif ($diaProgramaNorm == 'miércoles a viernes' && in_array($dia, ['Miércoles', 'Jueves', 'Viernes'])) return $p;
+            elseif ($diaProgramaNorm == 'lunes a martes' && in_array($dia, ['Lunes', 'Martes'])) return $p;
+            elseif ($diaProgramaNorm == 'lunes y miércoles' && in_array($dia, ['Lunes', 'Miércoles'])) return $p;
+            elseif ($diaProgramaNorm == 'lunes y jueves' && in_array($dia, ['Lunes', 'Jueves'])) return $p;
+            elseif (strpos($diaProgramaNorm, $diaNorm) !== false) return $p;
         }
     }
     return null;
