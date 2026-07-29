@@ -26,11 +26,6 @@ function supabaseRequest($endpoint, $method = 'GET', $data = null, $queryParams 
     }
 
     $response = curl_exec($ch);
-    if (curl_errno($ch)) {
-        $error = curl_error($ch);
-        curl_close($ch);
-        die("Error en la petición cURL a Supabase: " . $error);
-    }
     curl_close($ch);
     return json_decode($response, true);
 }
@@ -137,7 +132,6 @@ if ($_SERVER["REQUEST_METHOD"] === 'POST' && isset($_POST['login_action'])) {
 
 // Vista del Login
 if (isset($_GET['page']) && $_GET['page'] === 'login') {
-  $posts = supabaseRequest('publicaciones', 'GET', null, 'order=id.desc');
   ?>
   <!DOCTYPE html>
   <html lang="es">

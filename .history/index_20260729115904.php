@@ -137,7 +137,6 @@ if ($_SERVER["REQUEST_METHOD"] === 'POST' && isset($_POST['login_action'])) {
 
 // Vista del Login
 if (isset($_GET['page']) && $_GET['page'] === 'login') {
-  $posts = supabaseRequest('publicaciones', 'GET', null, 'order=id.desc');
   ?>
   <!DOCTYPE html>
   <html lang="es">
